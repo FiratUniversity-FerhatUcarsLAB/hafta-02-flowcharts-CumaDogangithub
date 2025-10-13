@@ -1,0 +1,74 @@
+digraph ATM_Withdrawal {
+  rankdir=TB;
+  node [fontname="Inter,Arial", fontsize=10, shape=box];
+  edge [fontname="Inter,Arial", fontsize=9];
+
+  start    [label="Başla", shape=ellipse];
+  ready    [label="ATM hazır mı?", shape=diamond];
+  insert   [label="Kartı takın (zaman aşımı bekle)"];
+  readcard [label="Kart bilgilerini oku"];
+  readok   [label="Kart okunabildi mi?", shape=diamond];
+  lang     [label="Dil seçimi (ops.)"];
+  op       [label="İşlem seçimi: Para Çekme"];
+  amount   [label="Tutarı gir / seçenekten seç"];
+  amtchk   [label="Tutar uygun mu?\n(>0, banknot uygunluğu,\nlimitler)", shape=diamond];
+  pin      [label="PIN gir (maskeli)"];
+  pintry   [label="PIN doğru mu?", shape=diamond];
+  blocked  [label="PIN hatası M kez → Kart bloke/tut", shape=box];
+  auth     [label="Sunucuya yetkilendirme isteği gönder"];
+  authok   [label="Yetkilendirme sonucu", shape=diamond];
+  cashok   [label="Kasa/Banknot stoku yeterli mi?", shape=diamond];
+  mix      [label="Banknot dağılımını hesapla"];
+  dispense [label="Banknotları ver (sensör doğrulama ile)"];
+  dispok   [label="Tüm banknotlar verildi mi?", shape=diamond];
+  capture  [label="Kesin onay (capture) / bakiye güncelle"];
+  receipt  [label="Fiş ister misiniz?\n(Yazdır/SMS/e-posta)", shape=diamond];
+  cardret  [label="Kartı iade et (zaman aşımı ile)"];
+  log      [label="İşlemi logla (maskeli veriler)"];
+  success  [label="Başarılı → Özet göster", shape=box];
+  fail     [label="Hata/İptal → Bilgilendir", shape=box];
+  end      [label="Bitiş / Ana ekrana dön", shape=ellipse];
+
+  // Akış
+  start -> ready;
+  ready -> insert [label="Evet"];
+  ready -> fail   [label="Hayır"];
+  insert -> readcard;
+  readcard -> readok;
+  readok -> lang [label="Evet"];
+  readok -> fail [label="Hayır (iade/tut)"];
+
+  lang -> op;
+  op -> amount;
+  amount -> amtchk;
+  amtchk -> pin [label="Uygun"];
+  amtchk -> amount [label="Uygun değil\n(tekrar gir)"];
+
+  pin -> pintry;
+  pintry -> auth [label="Doğru"];
+  pintry -> pin  [label="Yanlış ama < M"];
+  pintry -> blocked [label="Yanlış ≥ M"];
+  blocked -> fail;
+
+  auth -> authok;
+  authok -> mix   [label="Onay"];
+  authok -> amount[label="Red → Daha az tutar?"];
+  authok -> fail  [label="Ağ/Timeout (tekrar da başarısız)"];
+
+  mix -> cashok;
+  cashok -> dispense [label="Yeterli"];
+  cashok -> fail     [label="Yetersiz (rezerv iptal)"];
+
+  dispense -> dispok;
+  dispok -> capture [label="Evet"];
+  dispok -> fail    [label="Hayır (kısmi/verilemedi)"];
+
+  capture -> receipt;
+  receipt -> cardret [label="Evet/ Hayır"];
+  cardret -> log;
+  log -> success;
+  success -> end;
+
+  // Hata durumları ortak bitiş
+  fail -> end;
+}
