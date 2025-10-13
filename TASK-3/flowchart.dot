@@ -1,0 +1,132 @@
+digraph HRS {
+  graph [rankdir=LR, fontsize=12, labelloc="t", label="Hastane Randevu Sistemi – Akış Diyagramı (DOT)"];
+  node  [shape=box, style="rounded,filled", fillcolor="#f9fbff", color="#8aa0c8", fontname="Helvetica"];
+  edge  [color="#6b7da8", fontname="Helvetica"];
+
+  /* ===== Clusters (Roller) ===== */
+  subgraph cluster_hasta {
+    label="Hasta";
+    color="#cfe1ff";
+    style="rounded";
+    start      [shape=circle, label="Başla", fillcolor="#eaf1ff"];
+    kayit_giris [label="Kayıt Ol / Giriş Yap\n(TC & e-posta doğrulama,\nşifre özetleme, oturum token)"];
+    doktor_ara  [label="Doktor Ara\n(branş/poliklinik/tarih/ad)"];
+    musaitlik   [label="Müsaitlik Sorgula\n(15 dk slot hesapla,\ndolu slotları çıkar)"];
+    slot_var   [shape=diamond, label="Uygun slot var mı?"];
+    randevu_ol  [label="Randevu Oluştur\n(Atomik: limit kontrolü,\ngeçmiş engeli, slot kilidi)"];
+    bekleme_kayit [label="Bekleme Listesine Kaydol\n(öncelik skoru)"];
+    bildirim_ol [label="Bildirim: Randevu Oluşturuldu"];
+    iptal_istek [label="İptal İsteği"];
+    iptal_kural [shape=diamond, label="İptal süresi uygun mu?\n(≥ 2 saat kala)"];
+    guncelle_istek [label="Tarih/Saat Değiştir İsteği"];
+    yeni_slot  [shape=diamond, label="Yeni slot uygun mu?"];
+    tasima      [label="Randevuyu Taşı\n(eski slot boşalır)"];
+    checkin     [label="Check-in (geliş bildirimi)"];
+    gec_checkin [shape=diamond, label="Geç check-in mi?\n(≤ 10 dk kala)"];
+    uyar_gec    [label="Uyarı/Not: Geç Check-in"];
+    muayene     [label="Muayene"];
+    tamamlandi  [shape=doublecircle, label="Randevu: TAMAMLANDI", fillcolor="#eaf1ff"];
+  }
+
+  subgraph cluster_sekreter {
+    label="Sekreter / Operasyon";
+    color="#d6f5ff"; style="rounded";
+    onay       [label="Randevu Onayla\n(otomasyon veya el ile)"];
+    iptal_op   [label="Randevuyu İptal Et\n(gerekçeyle)"];
+    acil       [label="Acil Durum Randevusu\n(öncelik tanı, esnek tahsis)"];
+  }
+
+  subgraph cluster_sistem {
+    label="Sistem Otomasyonları";
+    color="#e8ffe6"; style="rounded";
+    hatirlat_24 [label="Hatırlatıcı: 24 saat önce\n(SMS/e-posta)"];
+    hatirlat_2  [label="Hatırlatıcı: 2 saat önce\n(SMS/e-posta)"];
+    no_show_k   [label="No-Show Kontrolü\n(+30 dk gelmeyenleri işaretle)"];
+    bekleme_tetik [label="Bekleme Listesi Tetikle\n(slot boşalınca)"];
+    aday_bildirim [label="Adaya Bildirim: Slot Boşaldı\n(15 dk onay penceresi)"];
+    aday_onay  [shape=diamond, label="Aday onay verdi mi?\n(≤ 15 dk)"];
+    aday_ata    [label="Slotu Adaya Ata\n(Yeni randevu oluştur)"];
+  }
+
+  subgraph cluster_doktor {
+    label="Doktor";
+    color="#fff0d6"; style="rounded";
+    takvim_yonet [label="Takvimi Yönet\n(slot ekle/kaldır)\n(Dolu slot varsa engel)"];
+    randevu_durum [label="Randevu Durum Güncelle\n(ör. muayene başlat/bitti)"];
+  }
+
+  subgraph cluster_yonetim {
+    label="Yönetici / Raporlama";
+    color="#f3e8ff"; style="rounded";
+    raporlama  [label="Raporlama:\n• Randevu sayıları\n• No-show oranı\n• Bekleme listesi dönüşüm\n• Doluluk & bekleme süresi"];
+  }
+
+  /* ===== Güvenlik & Log ===== */
+  guvenlik [label="Güvenlik:\n• Rol bazlı yetki\n• Oran sınırlama (login)\n• Hassas veri koruma", shape=note, fillcolor="#fff9e6", color="#d3b24d"];
+  loglama  [label="Denetim Kaydı (LOG)\nTüm kritik olaylar", shape=note, fillcolor="#fff9e6", color="#d3b24d"];
+
+  /* ===== Akış Kenarları (Hasta Yolculuğu) ===== */
+  start -> kayit_giris;
+  kayit_giris -> doktor_ara;
+  doktor_ara -> musaitlik;
+  musaitlik -> slot_var;
+  slot_var -> randevu_ol [label="Evet"];
+  slot_var -> bekleme_kayit [label="Hayır"];
+
+  randevu_ol -> onay;
+  onay -> bildirim_ol;
+  bildirim_ol -> hatirlat_24;
+  hatirlat_24 -> hatirlat_2;
+
+  /* Güncelleme / İptal akışları */
+  bildirim_ol -> guncelle_istek [label="Hasta isteği (yeniden planlama)"];
+  guncelle_istek -> yeni_slot;
+  yeni_slot -> tasima [label="Evet"];
+  yeni_slot -> guncelle_istek [label="Hayır", style=dashed];
+
+  bildirim_ol -> iptal_istek [label="Hasta isteği (iptal)"];
+  iptal_istek -> iptal_kural;
+  iptal_kural -> iptal_op [label="Evet"];
+  iptal_kural -> iptal_istek [label="Hayır", style=dashed];
+
+  /* Randevu günü */
+  hatirlat_2 -> checkin;
+  checkin -> gec_checkin;
+  gec_checkin -> uyar_gec [label="Evet"];
+  gec_checkin -> muayene [label="Hayır"];
+  uyar_gec -> muayene;
+  muayene -> randevu_durum;
+  randevu_durum -> tamamlandi;
+
+  /* No-Show ve Bekleme Listesi */
+  hatirlat_2 -> no_show_k [label="Zaman akışı"];
+  iptal_op -> bekleme_tetik;
+  tasima -> bekleme_tetik [label="Eski slot için"];
+  bekleme_kayit -> bekleme_tetik [label="Slot boşalınca", style=dashed];
+  bekleme_tetik -> aday_bildirim;
+  aday_bildirim -> aday_onay;
+  aday_onay -> aday_ata [label="Evet"];
+  aday_onay -> bekleme_tetik [label="Hayır → Sonraki aday"];
+
+  /* Doktor ve Yönetim bağlantıları */
+  takvim_yonet -> doktor_ara [label="Güncel planın etkisi", style=dashed];
+  raporlama -> takvim_yonet [label="İyileştirme için geri besleme", style=dashed];
+
+  /* Güvenlik & Log (genel, noktalı) */
+  guvenlik -> kayit_giris [style=dotted];
+  guvenlik -> randevu_ol   [style=dotted];
+  guvenlik -> iptal_op     [style=dotted];
+  guvenlik -> takvim_yonet [style=dotted];
+
+  loglama -> kayit_giris   [style=dotted];
+  loglama -> randevu_ol    [style=dotted];
+  loglama -> iptal_op      [style=dotted];
+  loglama -> aday_ata      [style=dotted];
+  loglama -> randevu_durum [style=dotted];
+
+  /* Kenar etiketleri (iş kuralları) */
+  randevu_ol -> bildirim_ol [label="Durum: REZERVE/ONAYLI"];
+  iptal_op -> bekleme_tetik [label="Slot boşaldı"];
+  no_show_k -> raporlama    [label="No-show oranları", style=dashed];
+  tamamlandi -> raporlama   [label="Tamamlanan işlemler", style=dashed];
+}
