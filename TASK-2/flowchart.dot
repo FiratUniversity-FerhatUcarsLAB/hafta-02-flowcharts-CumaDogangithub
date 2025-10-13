@@ -1,0 +1,75 @@
+digraph OnlineAlisverisSepeti {
+  rankdir=TB;
+  labelloc="t";
+  label="Online Alışveriş Sepeti Algoritması (DOT)";
+  node [shape=rectangle, style=rounded, fontsize=11];
+
+  start   [shape=circle, label="Başla"];
+  load    [label="Sepeti yükle\n(üye/misafir)"];
+
+  menu    [shape=diamond, label="İşlem seç?"];
+  add     [label="Ürün ekle:\n• Ürün/varyant al\n• Bilgileri getir\n• Stok/limit kontrol"];
+  add_ok  [label="Sepete ekle /\nmevcut miktarı güncelle"];
+  del     [label="Ürün sil:\n• Kalemi sepetten kaldır"];
+  upd     [label="Miktar güncelle:\n• Sınırları uygula\n• 0 ise kalemi kaldır"];
+  coupon  [label="Kupon uygula:\n• Kod doğrula\n• Sepete bağla"];
+  ship    [label="Kargo/Adres seç:\n• Yöntem ve adres kaydet"];
+
+  totals  [label="Toplamları hesapla:\nAltToplam + KDV + Kargo - İndirim\n(uygun ise yuvarlama)"];
+
+  stock   [shape=diamond, label="Stok yeterli mi?"];
+  stock_fix [label="Eksik ürünleri düşür/\n0 ise kaldır"];
+
+  empty   [shape=diamond, label="Sepet boş mu?"];
+  empty_err [shape=Msquare, label="Hata:\nStok yetersiz"];
+
+  reserve [label="Stok geçici rezervasyon"];
+  reserve_ok [shape=diamond, label="Rezervasyon başarılı mı?"];
+  reserve_err [shape=Msquare, label="Hata:\nRezervasyon başarısız"];
+
+  pay     [label="Ödeme onayı iste"];
+  pay_ok  [shape=diamond, label="Ödeme onaylandı mı?"];
+  cancel_res [label="Rezervasyonu iptal et"];
+  pay_err [shape=Msquare, label="Hata:\nÖdeme reddedildi"];
+
+  order   [label="Sipariş oluştur:\n• Stok kalıcı düş\n• Sepeti temizle"];
+  done    [shape=doublecircle, label="Bitiş\n(Sipariş no göster)"];
+
+  // Akış
+  start -> load -> menu;
+
+  menu -> add   [label="Ürün Ekle"];
+  add  -> add_ok -> menu;
+
+  menu -> del   [label="Ürün Sil"];
+  del  -> menu;
+
+  menu -> upd   [label="Miktar Güncelle"];
+  upd  -> menu;
+
+  menu -> coupon [label="Kupon"];
+  coupon -> menu;
+
+  menu -> ship   [label="Kargo/Adres"];
+  ship -> totals;
+
+  totals -> stock;
+  stock -> totals [label="Hayır\n(Fiyat/kur güncel ise tekrar hesap)", style=dashed];
+  stock -> stock_fix [label="Hayır"];
+  stock_fix -> totals;
+
+  totals -> empty;
+  empty -> empty_err [label="Evet"];
+  empty -> reserve   [label="Hayır"];
+
+  reserve -> reserve_ok;
+  reserve_ok -> reserve_err [label="Hayır"];
+  reserve_ok -> pay         [label="Evet"];
+
+  pay -> pay_ok;
+  pay_ok -> cancel_res [label="Hayır"];
+  cancel_res -> pay_err;
+
+  pay_ok -> order [label="Evet"];
+  order -> done;
+}
