@@ -1,0 +1,101 @@
+digraph DersKayit {
+  rankdir=TB;
+  fontname="Arial";
+  node [shape=box, style=rounded, fontname="Arial"];
+  edge [fontname="Arial"];
+
+  // Düğümler
+  Start   [label="Başla", shape=circle];
+  Girdi   [label="Girdi Bilgilerini Topla\n(öğrenci, dönem, kredi sınırı,\nönkoşullar, kontenjanlar, takvim)"];
+  EriSim  [label="Erişim/Engel Kontrolü?", shape=diamond];
+  Engel   [label="Kayıt engeli var\n(borç/idarî engel)", shape=box, style="rounded,filled", fillcolor="#ffe5e5"];
+  Zorunlu [label="Zorunlu Ders Öncelik Listesi Oluştur"];
+  Secmeli [label="Seçmeli Ders Aday Havuzu Oluştur\n(alan içi/ortak/seçmeli puanlama)"];
+  Loop    [label="Ders Ekleme Döngüsü\n(her ders için kontroller)"];
+
+  Onkosul [label="Önkoşul sağlandı mı?", shape=diamond];
+  Cakis   [label="Saat/Şube çakışması var mı?", shape=diamond];
+  Altern  [label="Alternatif şube var mı?", shape=diamond];
+  Kredi   [label="Kredi sınırı aşılır mı?", shape=diamond];
+  Kont    [label="Kontenjan var mı?", shape=diamond];
+  Oncelik [label="Sınıf/başarı önceliği uygun mu?", shape=diamond];
+
+  Atla1   [label="Dersi atla\n(önkoşul sağlanmadı)"];
+  Atla2   [label="Dersi atla\n(çakışma çözülemedi)"];
+  Cikar   [label="Seçmeli çıkar → Zorunluyu dene\nyoksa dersi atla"];
+  Bekle   [label="Bekleme listesine ekle"];
+  Ekle    [label="Derse kayıt talebi oluştur"];
+
+  BeklemeYonet [label="Bekleme Listesi Yönetimi\n(kontenjan açıldıkça otomatik ekleme)"];
+
+  Danisman [label="Danışman onayı gerekli mi?", shape=diamond];
+  DanGon   [label="Danışmana gönder\n→ geri bildirimle düzenle"];
+  Kesin    [label="Kesinleştirme isteği\n(öğrenci butonu/harç kontrolü)"];
+  SonKont  [label="Son Kontroller\n(önkoşul/çakışma/kredi/kontenjan/engel)", shape=diamond];
+  Hata     [label="Hata var → düzelt ve tekrar dene"];
+  Kilit    [label="Kayıt Kesinleşti\n(dersler kilitlendi)"];
+
+  EkleCikar [label="Ekle/Çıkar Haftası\n(değişiklikte tüm kontroller yeniden)"];
+  Ozel     [label="Özel Durumlar\n(şube değişimi, tekrar dersi,\nüstten/alttan, ÇAP/Yandal,\nkontenjan aşımı için özel izin)"];
+  Cikti    [label="Çıktılar: Program, toplam kredi/AKTS,\nzorunlu–seçmeli dağılımı, onay durumu,\nbekleme listesi ve bildirimler"];
+  End     [label="Bitir", shape=doublecircle];
+
+  // Akış
+  Start -> Girdi -> EriSim;
+  EriSim -> Engel [label="Evet"];
+  Engel  -> End;
+  EriSim -> Zorunlu [label="Hayır"];
+  Zorunlu -> Secmeli -> Loop;
+
+  // Döngü detayları (tekrarlı mantık)
+  Loop -> Onkosul;
+  Onkosul -> Atla1 [label="Hayır"];
+  Onkosul -> Cakis [label="Evet"];
+
+  Cakis -> Altern [label="Evet"];
+  Cakis -> Atla2  [label="Hayır"];
+  Altern -> Cakis [label="Hayır\n(çözülemedi)"];
+  Altern -> Kredi [label="Evet"];
+
+  Kredi -> Cikar [label="Evet"];
+  Kredi -> Kont  [label="Hayır"];
+
+  Kont -> Bekle [label="Hayır"];
+  Kont -> Oncelik [label="Evet"];
+
+  Oncelik -> Ekle [label="Evet"];
+  Oncelik -> Bekle [label="Hayır"];
+
+  // Döngüden çıkış (tüm dersler denendikten sonra)
+  Atla1 -> Loop;
+  Atla2 -> Loop;
+  Cikar -> Loop;
+  Bekle -> Loop;
+  Ekle  -> Loop;
+
+  // Bekleme listesi yönetimi (paralel süreç)
+  Loop -> BeklemeYonet [label="Tüm dersler işlendi"];
+  BeklemeYonet -> Danisman;
+
+  // Danışman ve kesinleştirme
+  Danisman -> DanGon [label="Evet"];
+  DanGon   -> Kesin;
+  Danisman -> Kesin  [label="Hayır"];
+
+  Kesin -> SonKont;
+  SonKont -> Hata [label="Hata var"];
+  Hata   -> Kesin;
+  SonKont -> Kilit [label="Uygun"];
+
+  // Ekle/çıkar, özel durumlar, çıktı
+  Kilit -> EkleCikar;
+  EkleCikar -> Ozel;
+  Ozel -> Cikti -> End;
+
+  // Görsel kümeleme (opsiyonel altgrafikler)
+  subgraph cluster_checks {
+    label="Ders Bazlı Kontroller";
+    style=dashed;
+    Onkosul; Cakis; Altern; Kredi; Kont; Oncelik;
+  }
+}
