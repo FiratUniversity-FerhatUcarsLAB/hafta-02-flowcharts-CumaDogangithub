@@ -1,74 +1,108 @@
-digraph ATM_Withdrawal {
+digraph ATM {
   rankdir=TB;
-  node [fontname="Inter,Arial", fontsize=10, shape=box];
-  edge [fontname="Inter,Arial", fontsize=9];
+  node [shape=box, fontname="Arial", fontsize=11];
 
-  start    [label="Başla", shape=ellipse];
-  ready    [label="ATM hazır mı?", shape=diamond];
-  insert   [label="Kartı takın (zaman aşımı bekle)"];
-  readcard [label="Kart bilgilerini oku"];
-  readok   [label="Kart okunabildi mi?", shape=diamond];
-  lang     [label="Dil seçimi (ops.)"];
-  op       [label="İşlem seçimi: Para Çekme"];
-  amount   [label="Tutarı gir / seçenekten seç"];
-  amtchk   [label="Tutar uygun mu?\n(>0, banknot uygunluğu,\nlimitler)", shape=diamond];
-  pin      [label="PIN gir (maskeli)"];
-  pintry   [label="PIN doğru mu?", shape=diamond];
-  blocked  [label="PIN hatası M kez → Kart bloke/tut", shape=box];
-  auth     [label="Sunucuya yetkilendirme isteği gönder"];
-  authok   [label="Yetkilendirme sonucu", shape=diamond];
-  cashok   [label="Kasa/Banknot stoku yeterli mi?", shape=diamond];
-  mix      [label="Banknot dağılımını hesapla"];
-  dispense [label="Banknotları ver (sensör doğrulama ile)"];
-  dispok   [label="Tüm banknotlar verildi mi?", shape=diamond];
-  capture  [label="Kesin onay (capture) / bakiye güncelle"];
-  receipt  [label="Fiş ister misiniz?\n(Yazdır/SMS/e-posta)", shape=diamond];
-  cardret  [label="Kartı iade et (zaman aşımı ile)"];
-  log      [label="İşlemi logla (maskeli veriler)"];
-  success  [label="Başarılı → Özet göster", shape=box];
-  fail     [label="Hata/İptal → Bilgilendir", shape=box];
-  end      [label="Bitiş / Ana ekrana dön", shape=ellipse];
+  start   [shape=circle, label="Başla"];
+  init    [label="ATM nakit durumunu ve sayaçları hazırla"];
+  insert  [label="Kart takıldı / Kartı oku"];
+  cardOk  [shape=diamond, label="Kart okunabildi mi?"];
+  reject  [label="Kartı iade et\nMesaj: Kart okunamadı"];
+  end     [shape=doublecircle, label="Bitiş"];
 
-  // Akış
-  start -> ready;
-  ready -> insert [label="Evet"];
-  ready -> fail   [label="Hayır"];
-  insert -> readcard;
-  readcard -> readok;
-  readok -> lang [label="Evet"];
-  readok -> fail [label="Hayır (iade/tut)"];
+  pin     [label="PIN iste"];
+  pinOk   [shape=diamond, label="PIN doğru mu?"];
+  incTry  [label="Deneme sayısını artır"];
+  tryLeft [shape=diamond, label="Deneme < 3 mü?"];
+  keep    [label="Kartı alıkoy\nMesaj: 3 hatalı PIN"];
+  session [label="Oturumu aç"];
 
-  lang -> op;
-  op -> amount;
-  amount -> amtchk;
-  amtchk -> pin [label="Uygun"];
-  amtchk -> amount [label="Uygun değil\n(tekrar gir)"];
+  menu    [label="MENÜ:\n1 Çekme | 2 Yatırma | 3 Bakiye\n4 Havale/EFT | 5 Şifre Değiştir | 0 Çıkış"];
+  choice  [shape=diamond, label="Seçim?"];
 
-  pin -> pintry;
-  pintry -> auth [label="Doğru"];
-  pintry -> pin  [label="Yanlış ama < M"];
-  pintry -> blocked [label="Yanlış ≥ M"];
-  blocked -> fail;
+  /* İşlemler */
+  wd      [label="Para Çekme\nTutar iste"];
+  wdOk    [shape=diamond, label="Tutar geçerli,\n10 TL katı,\nBakiye & ATM nakit yeterli,\nGünlük limit uygun mu?"];
+  wdFail  [label="Mesaj: Koşullar sağlanmıyor"];
+  wdDo    [label="Hesaptan düş\nATM para ver"];
+  
+  dep     [label="Para Yatırma\n(Nakit/Zarf)"];
+  depOk   [shape=diamond, label="Tutar geçerli mi?"];
+  depFail [label="Mesaj: Geçersiz tutar"];
+  depDo   [label="Hesaba ekle\n(geçici/teyitli)"];
 
-  auth -> authok;
-  authok -> mix   [label="Onay"];
-  authok -> amount[label="Red → Daha az tutar?"];
-  authok -> fail  [label="Ağ/Timeout (tekrar da başarısız)"];
+  bal     [label="Bakiye Sorgu\nBakiyeyi göster"];
 
-  mix -> cashok;
-  cashok -> dispense [label="Yeterli"];
-  cashok -> fail     [label="Yetersiz (rezerv iptal)"];
+  tr      [label="Havale/EFT\nIBAN + Tutar iste"];
+  trOk    [shape=diamond, label="IBAN geçerli,\nBakiye masrafla yeterli mi?"];
+  trFail  [label="Mesaj: IBAN/Bakiye hatası"];
+  trDo    [label="Hesaptan düş\nTransfer gönder"];
 
-  dispense -> dispok;
-  dispok -> capture [label="Evet"];
-  dispok -> fail    [label="Hayır (kısmi/verilemedi)"];
+  pinchg  [label="Şifre Değiştir\nEski PIN + Yeni PIN iste"];
+  pcOk    [shape=diamond, label="Eski PIN doğru ve\nyeni PIN kurala uygun mu?"];
+  pcFail  [label="Mesaj: PIN hatası/kuralsız"];
+  pcDo    [label="PIN güncelle"];
 
-  capture -> receipt;
-  receipt -> cardret [label="Evet/ Hayır"];
-  cardret -> log;
-  log -> success;
-  success -> end;
+  exitReq [label="Kartı iade et\nMesaj: İyi günler"];
+  againQ  [shape=diamond, label="Başka işlem?"];
+  
+  /* Akış */
+  start -> init -> insert -> cardOk;
+  cardOk -> reject [label="Hayır"];
+  reject -> end;
+  cardOk -> pin [label="Evet"];
 
-  // Hata durumları ortak bitiş
-  fail -> end;
+  pin -> pinOk;
+  pinOk -> session [label="Evet"];
+  pinOk -> incTry  [label="Hayır"];
+  incTry -> tryLeft;
+  tryLeft -> pin   [label="Evet"];
+  tryLeft -> keep  [label="Hayır"];
+  keep -> end;
+
+  session -> menu -> choice;
+
+  /* Seçimler */
+  choice -> wd     [label="1"];
+  choice -> dep    [label="2"];
+  choice -> bal    [label="3"];
+  choice -> tr     [label="4"];
+  choice -> pinchg [label="5"];
+  choice -> exitReq[label="0"];
+  choice -> menu   [label="Diğer"];
+
+  /* Para Çekme */
+  wd -> wdOk;
+  wdOk -> wdDo   [label="Evet"];
+  wdOk -> wdFail [label="Hayır"];
+  wdFail -> againQ;
+  wdDo -> againQ;
+
+  /* Para Yatırma */
+  dep -> depOk;
+  depOk -> depDo   [label="Evet"];
+  depOk -> depFail [label="Hayır"];
+  depFail -> againQ;
+  depDo -> againQ;
+
+  /* Bakiye */
+  bal -> againQ;
+
+  /* Transfer */
+  tr -> trOk;
+  trOk -> trDo   [label="Evet"];
+  trOk -> trFail [label="Hayır"];
+  trFail -> againQ;
+  trDo -> againQ;
+
+  /* PIN Değiştir */
+  pinchg -> pcOk;
+  pcOk -> pcDo   [label="Evet"];
+  pcOk -> pcFail [label="Hayır"];
+  pcFail -> againQ;
+  pcDo -> againQ;
+
+  /* Döngü & Çıkış */
+  againQ -> menu   [label="Evet"];
+  againQ -> exitReq[label="Hayır"];
+  exitReq -> end;
 }
