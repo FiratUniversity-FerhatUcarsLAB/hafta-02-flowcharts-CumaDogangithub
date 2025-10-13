@@ -1,0 +1,39 @@
+digraph AkilliEvGuvenlik {
+    rankdir=TB;
+    node [shape=box, style=rounded, fontsize=11];
+
+    Start [label="BAŞLAT\n• Sistem açılır\n• Tarih/Saat senkronize edilir\n• Sensörler yüklenir"];
+    Mode [label="MOD YÖNETİMİ\n• Evde / Uzakta / Uyku / Tatil / Panik\n• Aktif sensör ve eşikler atanır"];
+    Loop [label="SÜREKLİ İZLEME DÖNGÜSÜ\n• Sensörleri oku\n• Yeni olay var mı?"];
+    NoEvent [label="Olay yok\n• Otomasyonları çalıştır\n• Döngüye geri dön"];
+    Event [label="Olay var → OLAY İŞLEME\n• Tür belirle\n• Filtre uygula\n• Öncelik ata"];
+    Decision [label="EYLEM KARAR AĞACI\n• Kritik / Yüksek / Orta / Düşük"];
+
+    Critical [label="Kritik Olay\n• Siren + Bildirim + Kilit\n• Enerji kes / Havalandırmayı aç"];
+    High [label="Yüksek Olay\n• Gecikme kontrolü\n• Kamera görüntüsü gönder"];
+    Medium [label="Orta Olay\n• Sessiz uyarı\n• Tekrarlarsa yükselt"];
+    Low [label="Düşük Olay\n• Logla\n• Gözlemle"];
+
+    User [label="KULLANICI ETKİLEŞİMİ\n• PIN/biometrik doğrulama\n• Yanlış alarm bildirimi"];
+    ArmDisarm [label="KUR/ÇÖZ MANTIĞI\n• Koşulları kontrol et\n• Giriş/çıkış gecikmesi"];
+    Automation [label="OTOMASYON SENARYOLARI\n• Işık, priz, kilit, kamera eylemleri"];
+    Fault [label="ARIZA & SABOTAJ\n• Pil / ağ / sinyal kontrolü"];
+    Log [label="KAYIT & GİZLİLİK\n• Olay kaydı + video sınırı"];
+    Learning [label="PERİYODİK BAKIM\n• Yanlış alarm istatistiği\n• Öğrenme ayarı"];
+    Backup [label="İLETİŞİM & YEDEKLEME\n• İnternet / hücresel\n• Bulut ve yerel kayıt"];
+    End [label="BİTİR\n• Bakım modu veya güvenli kapanış"];
+
+    Start -> Mode -> Loop;
+    Loop -> NoEvent [label="Hayır"];
+    Loop -> Event [label="Evet"];
+    Event -> Decision;
+    Decision -> Critical;
+    Decision -> High;
+    Decision -> Medium;
+    Decision -> Low;
+    Critical -> User;
+    High -> User;
+    Medium -> User;
+    Low -> User;
+    User -> ArmDisarm -> Automation -> Fault -> Log -> Learning -> Backup -> End;
+}
